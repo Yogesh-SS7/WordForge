@@ -218,7 +218,7 @@
       <div class="gen-settings-panel">
         <div class="gen-settings-title">⚙ Generation Settings</div>
 
-        <div class="gen-settings-row">
+        <div class="gen-settings-row" style="grid-template-columns:1fr;">
 
           <!-- Count selector -->
           <div class="gen-setting-group">
@@ -245,18 +245,45 @@
             </div>
           </div>
 
-          <!-- Min length -->
-          <div class="gen-setting-group">
-            <label class="gen-label" for="min-length">
-              Minimum Password Length
-            </label>
-            <div class="length-control">
-              <button type="button" class="length-btn" id="len-minus" aria-label="Decrease">−</button>
-              <span class="length-val" id="length-display">8</span>
-              <button type="button" class="length-btn" id="len-plus" aria-label="Increase">+</button>
-              <input type="hidden" id="min-length" value="8" />
+          <!-- Password Length (Min + Max + Presets) -->
+          <div class="gen-setting-group length-group-full">
+            <label class="gen-label">Password Length</label>
+
+            <!-- Quick exact-length presets -->
+            <div class="length-presets">
+              <span class="length-presets-label">Quick exact length:</span>
+              <button type="button" class="length-preset" data-len="6"  id="preset-6">6</button>
+              <button type="button" class="length-preset" data-len="8"  id="preset-8">8</button>
+              <button type="button" class="length-preset" data-len="10" id="preset-10">10</button>
+              <button type="button" class="length-preset active" data-len="12" id="preset-12">12</button>
+              <button type="button" class="length-preset" data-len="16" id="preset-16">16</button>
+              <button type="button" class="length-preset" data-len="20" id="preset-20">20</button>
             </div>
-            <span class="field-hint">characters minimum per password</span>
+
+            <!-- Min / Max steppers side-by-side -->
+            <div class="length-minmax-row">
+              <div class="length-stepper-wrap">
+                <span class="length-stepper-label">Min</span>
+                <div class="length-control">
+                  <button type="button" class="length-btn" id="len-min-minus" aria-label="Decrease min">−</button>
+                  <span class="length-val" id="min-length-display">12</span>
+                  <button type="button" class="length-btn" id="len-min-plus"  aria-label="Increase min">+</button>
+                </div>
+              </div>
+              <span class="length-range-sep">→</span>
+              <div class="length-stepper-wrap">
+                <span class="length-stepper-label">Max</span>
+                <div class="length-control">
+                  <button type="button" class="length-btn" id="len-max-minus" aria-label="Decrease max">−</button>
+                  <span class="length-val" id="max-length-display">12</span>
+                  <button type="button" class="length-btn" id="len-max-plus"  aria-label="Increase max">+</button>
+                </div>
+              </div>
+            </div>
+
+            <span class="field-hint" id="length-hint">exact 12 characters per password</span>
+            <input type="hidden" id="min-length" value="12" />
+            <input type="hidden" id="max-length" value="12" />
           </div>
 
         </div>
@@ -296,8 +323,8 @@
           <span class="stat-label">unique entries</span>
         </div>
         <div class="stat-chip stat-chip-orange" id="min-len-chip" style="display:none;">
-          <span class="stat-val" id="min-len-display">8</span>
-          <span class="stat-label">char min length</span>
+          <span class="stat-val" id="min-len-display">12</span>
+          <span class="stat-label" id="min-len-label">char length</span>
         </div>
         <div class="stat-chip stat-chip-warn" id="filtered-chip" style="display:none;">
           <span class="stat-val" id="filtered-count">0</span>

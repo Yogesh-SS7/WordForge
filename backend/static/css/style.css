@@ -402,7 +402,85 @@ input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
 input[type="number"] { -moz-appearance: textfield; }
 
-/* Min length stepper */
+/* Min/Max length group — spans full width inside the settings row */
+.length-group-full {
+  width: 100%;
+}
+
+/* Quick preset chips row */
+.length-presets {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.length-presets-label {
+  font-size: 0.71rem;
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  margin-right: 0.2rem;
+  white-space: nowrap;
+}
+
+.length-preset {
+  padding: 0.3rem 0.7rem;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 100px;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.length-preset:hover {
+  border-color: rgba(0, 255, 136, 0.35);
+  color: var(--accent-green);
+  background: rgba(0, 255, 136, 0.05);
+}
+
+.length-preset.active {
+  background: rgba(0, 255, 136, 0.12);
+  border-color: rgba(0, 255, 136, 0.5);
+  color: var(--accent-green);
+  box-shadow: 0 0 10px rgba(0, 255, 136, 0.15);
+}
+
+/* Min + Max steppers row */
+.length-minmax-row {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+}
+
+.length-stepper-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.length-stepper-label {
+  font-size: 0.72rem;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-muted);
+  min-width: 2.5ch;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.length-range-sep {
+  font-size: 1rem;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+/* Single stepper control (reused for both min and max) */
 .length-control {
   display: flex;
   align-items: center;
@@ -444,7 +522,11 @@ input[type="number"] { -moz-appearance: textfield; }
   .gen-settings-row {
     grid-template-columns: 1fr;
   }
+  .length-minmax-row {
+    gap: 1rem;
+  }
 }
+
 
 /* ── Submit Button ─────────────────────────────────────────── */
 .btn-generate {

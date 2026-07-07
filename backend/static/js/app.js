@@ -1,5 +1,7 @@
 // ============================================================
-//  WordForge — Frontend Logic (v2)
+//  WordForge — Frontend Logic (v3)
+//  Changes: Min + Max length steppers, quick-preset chips,
+//           max_length sent in POST, results badge updated.
 // ============================================================
 
 (function () {
@@ -8,7 +10,12 @@
   /* ── State ─────────────────────────────────────────────── */
   let allPasswords = [];
   let showingAll   = false;
-  const PREVIEW_MAX = 50;   // rows shown by default before "show all"
+  const PREVIEW_MAX = 50;
+
+  /* ── Generation settings state ─────────────────────────── */
+  let selectedCount = 100;
+  let minLen        = 12;   // default — matches preset-12 active
+  let maxLen        = 12;   // same as minLen → exact mode
 
   /* ── DOM Refs ──────────────────────────────────────────── */
   const form           = document.getElementById('osint-form');
@@ -22,6 +29,7 @@
   const uniqueCount    = document.getElementById('unique-count');
   const minLenChip     = document.getElementById('min-len-chip');
   const minLenDisplay  = document.getElementById('min-len-display');
+  const minLenLabel    = document.getElementById('min-len-label');
   const listContainer  = document.getElementById('wordlist-items');
   const showMoreWrap   = document.getElementById('show-more-wrap');
   const btnShowMore    = document.getElementById('btn-show-more');
@@ -30,24 +38,28 @@
   const btnReset       = document.getElementById('btn-reset');
   const toast          = document.getElementById('toast');
 
-  // Generation settings controls
+  // Count chips
   const countChips       = document.querySelectorAll('.count-chip');
   const customCountWrap  = document.getElementById('custom-count-wrap');
   const customCountInput = document.getElementById('custom-count');
-  const lenMinus         = document.getElementById('len-minus');
-  const lenPlus          = document.getElementById('len-plus');
-  const lenDisplay       = document.getElementById('length-display');
-  const lenInput         = document.getElementById('min-length');
 
-  /* ── Generation Settings State ─────────────────────────── */
-  let selectedCount = 100;  // default chip value
+  // Length controls
+  const lenMinMinus      = document.getElementById('len-min-minus');
+  const lenMinPlus       = document.getElementById('len-min-plus');
+  const lenMaxMinus      = document.getElementById('len-max-minus');
+  const lenMaxPlus       = document.getElementById('len-max-plus');
+  const minLenDisplayEl  = document.getElementById('min-length-display');
+  const maxLenDisplayEl  = document.getElementById('max-length-display');
+  const minLenInput      = document.getElementById('min-length');
+  const maxLenInput      = document.getElementById('max-length');
+  const lengthHint       = document.getElementById('length-hint');
+  const lengthPresets    = document.querySelectorAll('.length-preset');
 
   /* ── Count Chip Logic ──────────────────────────────────── */
   countChips.forEach(chip => {
     chip.addEventListener('click', () => {
       countChips.forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
-
       if (chip.dataset.count === 'custom') {
         customCountWrap.style.display = 'flex';
         selectedCount = parseInt(customCountInput.value, 10) || 200;
@@ -65,20 +77,73 @@
     selectedCount = v;
   });
 
-  /* ── Min Length Stepper ────────────────────────────────── */
-  let minLen = 8;
+  /* ── Length Helpers ────────────────────────────────────── */
+  function syncLengthUI() {
+    // Update display spans
+    minLenDisplayEl.textContent = minLen;
+    maxLenDisplayEl.textContent = maxLen;
 
-  function updateLenDisplay() {
-    lenDisplay.textContent = minLen;
-    lenInput.value = minLen;
+    // Update hidden inputs (sent in POST body)
+    minLenInput.value = minLen;
+    maxLenInput.value = maxLen;
+
+    // Update hint text
+    if (minLen === maxLen) {
+      lengthHint.textContent = `exact ${minLen} characters per password`;
+    } else {
+      lengthHint.textContent = `between ${minLen} and ${maxLen} characters per password`;
+    }
+
+    // Clear preset highlight if values no longer match any preset
+    const matchedPreset = [...lengthPresets].find(
+      b => parseInt(b.dataset.len, 10) === minLen && minLen === maxLen
+    );
+    lengthPresets.forEach(b => b.classList.remove('active'));
+    if (matchedPreset) matchedPreset.classList.add('active');
   }
 
-  lenMinus.addEventListener('click', () => {
-    if (minLen > 1) { minLen--; updateLenDisplay(); }
+  /* ── Min stepper ───────────────────────────────────────── */
+  lenMinMinus.addEventListener('click', () => {
+    if (minLen > 1) {
+      minLen--;
+      // If minLen goes below maxLen in exact mode, allow range; else just decrement
+      if (minLen > maxLen) maxLen = minLen;
+      syncLengthUI();
+    }
   });
 
-  lenPlus.addEventListener('click', () => {
-    if (minLen < 64) { minLen++; updateLenDisplay(); }
+  lenMinPlus.addEventListener('click', () => {
+    if (minLen < 64) {
+      minLen++;
+      // Min can't exceed max — push max up with it
+      if (minLen > maxLen) maxLen = minLen;
+      syncLengthUI();
+    }
+  });
+
+  /* ── Max stepper ───────────────────────────────────────── */
+  lenMaxMinus.addEventListener('click', () => {
+    if (maxLen > minLen) {
+      maxLen--;
+      syncLengthUI();
+    }
+    // If maxLen == minLen, it becomes exact mode — that's fine, do nothing extra
+  });
+
+  lenMaxPlus.addEventListener('click', () => {
+    if (maxLen < 64) {
+      maxLen++;
+      syncLengthUI();
+    }
+  });
+
+  /* ── Preset buttons ────────────────────────────────────── */
+  lengthPresets.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const n = parseInt(btn.dataset.len, 10);
+      minLen = maxLen = n;   // exact mode
+      syncLengthUI();
+    });
   });
 
   /* ── Toast Helper ──────────────────────────────────────── */
@@ -144,6 +209,7 @@
       // Generation controls
       count:           selectedCount,
       min_length:      minLen,
+      max_length:      maxLen,   // new — hard ceiling enforced by backend
     };
   }
 
@@ -169,7 +235,6 @@
     items.forEach((pw, i) => {
       const row = document.createElement('div');
       row.className = 'wordlist-item';
-      // Stagger animation only for first 50 items to avoid lag
       row.style.animationDelay = `${Math.min(i * 8, 400)}ms`;
       row.innerHTML = `
         <span class="item-idx">${String(i + 1).padStart(3, '0')}</span>
@@ -179,7 +244,6 @@
       listContainer.appendChild(row);
     });
 
-    // Row-level copy buttons
     listContainer.querySelectorAll('.item-copy-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         navigator.clipboard.writeText(btn.dataset.pw)
@@ -187,7 +251,6 @@
       });
     });
 
-    // Show/hide toggle
     if (passwords.length > PREVIEW_MAX) {
       showMoreWrap.style.display = 'block';
       btnShowMore.textContent = all
@@ -213,17 +276,25 @@
     wordCount.textContent   = data.wordcount;
     uniqueCount.textContent = data.wordcount;
 
-    // Show min-length badge
-    if (data.min_length && data.min_length > 1) {
-      minLenDisplay.textContent = data.min_length;
-      minLenChip.style.display  = 'flex';
+    // Update the length badge
+    const rMin = data.min_length;
+    const rMax = data.max_length ?? rMin;   // backwards compat: old server may not send max_length
+
+    if (rMin && rMin > 1) {
+      if (rMin === rMax) {
+        minLenDisplay.textContent = rMin;
+        minLenLabel.textContent   = 'char fixed';
+      } else {
+        minLenDisplay.textContent = `${rMin}–${rMax}`;
+        minLenLabel.textContent   = 'char range';
+      }
+      minLenChip.style.display = 'flex';
     } else {
-      minLenChip.style.display  = 'none';
+      minLenChip.style.display = 'none';
     }
 
     renderList(allPasswords, false);
 
-    // Fade-in animation
     resultsSection.style.display = 'block';
     requestAnimationFrame(() => {
       requestAnimationFrame(() => resultsSection.classList.add('visible'));
@@ -328,7 +399,10 @@
     hideError();
   });
 
-  /* ── Bind Submit (form only — button is type=submit, no duplicate listener needed) */
+  /* ── Bind Submit ───────────────────────────────────────── */
   form.addEventListener('submit', handleGenerate);
+
+  /* ── Init ──────────────────────────────────────────────── */
+  syncLengthUI();   // render initial state (preset 12 active)
 
 })();

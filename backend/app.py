@@ -31,13 +31,12 @@ OLLAMA_URL      = "http://localhost:11434/api/generate"
 OLLAMA_MODEL    = "dolphin-llama3:8b"
 REQUEST_TIMEOUT = 300   # seconds per OLLAMA call
 
-# Context window to use.  Must be ≤ what the model can handle in RAM.
-# dolphin-llama3:8b ships with a 4096-token rope by default.
+# Context window — dolphin-llama3:8b supports 4096 by default.
 NUM_CTX = 4096
 
-# Passwords per single OLLAMA call.  Keeping this low (≤40) ensures
-# prompt + output always fits inside NUM_CTX without overflow.
-CHUNK_SIZE = 40
+# Passwords per single OLLAMA call.
+# Larger = fewer sequential calls = less total wait time.
+CHUNK_SIZE = 80
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -58,12 +57,17 @@ def _format_dob(dob_str: str) -> str:
         return dob_str
 
 
-def _build_prompt(data: dict, count: int, min_length: int) -> str:
+# ── FIX #3: Simplified prompt ─────────────────────────────────────────────────
+# Previous prompt had 6 numbered rules + leet-speak + style instructions.
+# 8B models ignore complex multi-rule prompts and output numbered lists anyway.
+# Keep it short and direct: one length constraint (max only), no leet-speak,
+# no style mixing — let the model do what it does naturally.
+def _build_prompt(data: dict, count: int, max_length: int) -> str:
     """
-    Concise prompt optimised for small local LLMs (≤8B parameters).
-    Verbose "CRITICAL RULES" framing causes 8B models to echo the rules
-    back instead of generating passwords, so we keep instructions short
-    and direct.
+    Short, direct prompt for small local LLMs.
+    Only one length constraint: max_length (upper ceiling).
+    No leet-speak instructions — the model applies them naturally.
+    No style mixing instructions — keep prompt noise minimal.
     """
     lines = []
 
@@ -88,103 +92,128 @@ def _build_prompt(data: dict, count: int, min_length: int) -> str:
     osint_block = "\n".join(lines) if lines else "(no data provided)"
 
     prompt = (
-        f"Generate exactly {count} password candidates for the person described below.\n\n"
-        f"Rules:\n"
-        f"1. Every password must be at least {min_length} characters long.\n"
-        f"2. No spaces — passwords are single unbroken strings (no spaces ever).\n"
-        f"3. Use only information from the personal data to build each password.\n"
-        f"4. Mix styles: lowercase, FirstCap, CamelCase, leet (a=4, e=3, i=1, o=0, s=5).\n"
-        f"5. Output exactly {count} lines. Each line is one password. Nothing else.\n"
-        f"6. No numbering, no bullets, no explanations, no blank lines.\n\n"
-        f"Personal data:\n{osint_block}\n\n"
+        f"Generate {count} password candidates for the person below.\n"
+        f"Each password must be under {max_length} characters and contain no spaces.\n"
+        f"Use names, dates, nicknames, and numbers from the personal data.\n"
+        f"Output one password per line. No explanations.\n\n"
+        f"{osint_block}\n\n"
         f"Passwords:"
     )
     return prompt
 
 
-def _clean_passwords(raw_text: str) -> list[str]:
+# ── FIX #1 + #2: Reordered pipeline + truncation instead of drop ──────────────
+def _clean_passwords(raw_text: str, max_length: int, min_length: int) -> tuple[list[str], int]:
     """
-    Strip all formatting junk from LLM output and return clean, unique passwords.
-    Zero-tolerance on spaces — any line containing a space is rejected.
-    """
-    seen   = set()
-    result = []
+    Extract clean, unique passwords from raw LLM output.
 
-    # Patterns whose matching lines are always junk (instructions echoed back, headers, etc.)
+    FIX #1 — Strip numbering/bullets BEFORE the reject filter.
+    Previously reject_re contained '1.' '2.' etc. which matched numbered-list
+    lines and discarded them BEFORE strip_num_re could clean them.
+    Now strip runs first, so "1. rohanparmar2004" → "rohanparmar2004" → accepted.
+
+    FIX #2 — Truncation instead of hard drop for length.
+    Previously any password outside [min, max] was silently dropped.
+    With a 12-15 char window, 90%+ of LLM output was discarded.
+    Now:
+      - Passwords longer than max_length are TRUNCATED to max_length.
+      - Passwords shorter than max(4, min_length // 2) are dropped
+        (genuine fragments, not real passwords).
+      - Everything else is kept as-is.
+
+    FIX #4 (bonus) — Spaces are normalised to '' instead of causing a drop.
+    "Rohan Parmar" → "RohanParmar" (still OSINT-derived, still usable).
+    Only lines with 4+ spaces are dropped (these are prose sentences).
+    """
+    seen    = set()
+    result  = []
+    dropped = 0
+
+    # Strip patterns — run FIRST before any rejection logic
+    strip_num_re = re.compile(r"^\d+[.)\-]\s+")   # "1. " / "42) " / "7- "
+    strip_bul_re = re.compile(r"^[-*•·]\s+")       # "- " / "* " / "• "
+
+    # Reject patterns — only genuine junk that cannot be a password after stripping.
+    # NO longer contains 1\. 2\. etc. — those are handled by strip_num_re above.
     reject_re = re.compile(
         r"^(\s*$"
-        r"|#+\s"
-        r"|[-*]\s{0,2}(pattern|technique|example|note|rule|output|here|begin"
-        r"|sure|okay|of course|critical|follow|every|apply|build|use|mix"
-        r"|no |password|generate)[:\s]"
-        r"|(here are|these are|note:|sure!|okay|of course|begin|output:|passwords?:"
-        r"|based on|personal data|rules?:|1\.|2\.|3\.|4\.|5\.|6\.)"
-        r"|[`]{1,3}"
-        r"|={3,}"
-        r"|-{3,})",
+        r"|#{1,}\s"                                 # markdown headers
+        r"|here are|these are"                      # preamble phrases
+        r"|note:|sure!|okay|of course"
+        r"|output:|passwords?:\s*$"                 # "Passwords:" header
+        r"|based on|personal data"
+        r"|[`]{1,3}"                                # code fences
+        r"|={3,}"                                   # separator lines
+        r"|-{3,})",                                 # horizontal rules
         re.IGNORECASE,
     )
-    strip_num_re = re.compile(r"^\d+[.)\-]\s+")   # "1. " / "1) " / "1- "
-    strip_bul_re = re.compile(r"^[-*•·]\s+")
+
+    # Absolute minimum: drop only true fragments (< 4 chars or < half of min_length)
+    min_keep = max(4, min_length // 2)
 
     for line in raw_text.splitlines():
         line = line.strip()
-        if not line or reject_re.match(line):
+        if not line:
             continue
 
-        # Strip numbering / bullet prefixes the LLM sometimes adds
-        line = strip_num_re.sub("", line)
-        line = strip_bul_re.sub("", line)
-        line = line.strip()
+        # ── STEP 1: Strip numbering and bullets FIRST ─────────────────────
+        line = strip_num_re.sub("", line).strip()
+        line = strip_bul_re.sub("", line).strip()
 
         if not line:
             continue
 
-        # Reject over-long lines (prose paragraphs)
-        if len(line) > 128:
+        # ── STEP 2: Reject obvious junk lines ─────────────────────────────
+        if reject_re.match(line):
             continue
 
-        # ── FIX #1: zero-tolerance space filter ──────────────────────────
-        # Passwords must be single unbroken strings.  Any space means the
-        # LLM output a phrase / sentence instead of a password.
-        if " " in line:
+        # ── STEP 3: Normalise spaces (don't drop — fix instead) ───────────
+        # Lines with 4+ spaces are prose sentences, not passwords → drop
+        if line.count(" ") >= 4:
+            continue
+        # Fewer spaces: remove them (e.g. "Rohan Parmar" → "RohanParmar")
+        line = line.replace(" ", "")
+
+        # ── STEP 4: Drop genuine fragments ────────────────────────────────
+        if len(line) < min_keep:
+            dropped += 1
+            continue
+
+        # ── STEP 5: Truncate to max_length (not drop) ─────────────────────
+        if len(line) > max_length:
+            line = line[:max_length]
+
+        # ── STEP 6: Reject over-long prose that survived everything above ──
+        # (shouldn't happen after truncation but guard anyway)
+        if len(line) > 128:
             continue
 
         if line not in seen:
             seen.add(line)
             result.append(line)
 
-    return result
+    return result, dropped
 
 
-def _call_ollama(prompt: str, chunk_size: int) -> list[str]:
+def _call_ollama(prompt: str, chunk_size: int, max_length: int, min_length: int) -> tuple[list[str], int]:
     """
     Make one OLLAMA API call requesting `chunk_size` passwords.
-
-    FIX #2 — num_predict is capped so it never exceeds NUM_CTX.
-    When num_predict > num_ctx, OLLAMA silently resets it to its
-    internal default (~128 tokens), which is why we were getting only
-    12–16 passwords regardless of the requested count.
-
-    Safe formula:
-        prompt_budget  = 512 tokens  (generous upper bound for our prompt)
-        output_budget  = NUM_CTX - prompt_budget
-        num_predict    = min(output_budget, chunk_size * 18)
+    num_predict is capped to never exceed NUM_CTX − prompt_budget.
     """
-    prompt_budget  = 512
-    output_budget  = NUM_CTX - prompt_budget                 # e.g. 4096-512 = 3584
-    num_predict    = min(output_budget, chunk_size * 18)     # e.g. 40*18=720 ≪ 3584
+    prompt_budget = 512
+    output_budget = NUM_CTX - prompt_budget          # 4096 - 512 = 3584
+    num_predict   = min(output_budget, chunk_size * 15)
 
     payload = {
         "model":  OLLAMA_MODEL,
         "prompt": prompt,
         "stream": False,
         "options": {
-            "temperature":    0.75,
-            "top_p":          0.9,
-            "repeat_penalty": 1.15,
-            "num_ctx":        NUM_CTX,     # explicit context window
-            "num_predict":    num_predict, # always ≤ NUM_CTX − prompt_budget
+            "temperature":    0.8,
+            "top_p":          0.92,
+            "repeat_penalty": 1.1,
+            "num_ctx":        NUM_CTX,
+            "num_predict":    num_predict,
         },
     }
 
@@ -203,17 +232,20 @@ def _call_ollama(prompt: str, chunk_size: int) -> list[str]:
         resp.raise_for_status()
         raw_text = resp.json().get("response", "")
         log.info("OLLAMA chunk response: %d chars raw", len(raw_text))
-        return _clean_passwords(raw_text)
+        passwords, dropped = _clean_passwords(raw_text, max_length, min_length)
+        if dropped:
+            log.info("  └─ %d fragments dropped (too short)", dropped)
+        return passwords, dropped
 
     except requests.exceptions.ConnectionError:
         log.error("OLLAMA connection refused at %s", OLLAMA_URL)
-        return []
+        return [], 0
     except requests.exceptions.Timeout:
         log.error("OLLAMA call timed out after %ds", REQUEST_TIMEOUT)
-        return []
+        return [], 0
     except Exception as exc:
         log.error("OLLAMA call failed: %s", exc)
-        return []
+        return [], 0
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -254,48 +286,52 @@ def generate():
     except (TypeError, ValueError):
         min_length = 8
 
+    try:
+        raw_max    = data.get("max_length", min_length)
+        max_length = max(min_length, min(128, int(raw_max)))
+    except (TypeError, ValueError):
+        max_length = min_length
+
     log.info(
-        "Generating wordlist for: %s | count=%d | min_length=%d | "
+        "Generating wordlist for: %s | count=%d | max_length=%d | "
         "chunk_size=%d | num_ctx=%d",
-        full_name[:30], count, min_length, CHUNK_SIZE, NUM_CTX,
+        full_name[:30], count, max_length, CHUNK_SIZE, NUM_CTX,
     )
 
-    # ── FIX #3: Chunked generation ────────────────────────────────────────────
-    # We split the total request into chunks of CHUNK_SIZE so that
-    # prompt + output always fits well within NUM_CTX.
-    # Results from each chunk are merged and deduplicated.
+    # ── Chunked generation ────────────────────────────────────────────────────
     seen_passwords: set[str]  = set()
     all_passwords:  list[str] = []
-    remaining = count
-    chunk_num = 0
-    empty_chunks = 0           # consecutive empty chunk counter — safety stop
+    total_dropped = 0
+    remaining     = count
+    chunk_num     = 0
+    empty_chunks  = 0
 
     while remaining > 0 and len(all_passwords) < count:
         chunk_size = min(CHUNK_SIZE, remaining)
         chunk_num += 1
+        total_chunks = -(-count // CHUNK_SIZE)   # ceiling division
 
         log.info(
-            "Chunk %d/%d — requesting %d passwords (have %d / %d so far)",
-            chunk_num,
-            -(-count // CHUNK_SIZE),   # ceiling division = total expected chunks
-            chunk_size,
-            len(all_passwords),
-            count,
+            "Chunk %d/%d — requesting %d passwords (have %d / %d)",
+            chunk_num, total_chunks, chunk_size, len(all_passwords), count,
         )
 
-        prompt        = _build_prompt(data, chunk_size, min_length)
-        chunk_results = _call_ollama(prompt, chunk_size)
+        prompt                   = _build_prompt(data, chunk_size, max_length)
+        chunk_results, n_dropped = _call_ollama(prompt, chunk_size, max_length, min_length)
+        total_dropped           += n_dropped
 
         if not chunk_results:
             empty_chunks += 1
-            log.warning("Chunk %d returned no passwords (empty_chunks=%d)", chunk_num, empty_chunks)
+            log.warning(
+                "Chunk %d returned no passwords (empty_chunks=%d)",
+                chunk_num, empty_chunks,
+            )
             if empty_chunks >= 3:
-                log.error("3 consecutive empty chunks — stopping early to avoid infinite loop")
+                log.error("3 consecutive empty chunks — stopping early")
                 break
-            # Don't break immediately — retry the same remaining count
             continue
 
-        empty_chunks = 0   # reset counter on success
+        empty_chunks = 0
         added = 0
         for pw in chunk_results:
             if pw not in seen_passwords:
@@ -308,14 +344,17 @@ def generate():
 
     passwords = all_passwords
     log.info(
-        "Final wordlist: %d unique passwords (requested %d, ran %d chunks)",
-        len(passwords), count, chunk_num,
+        "Final wordlist: %d unique passwords (requested %d, %d chunks, %d fragments dropped)",
+        len(passwords), count, chunk_num, total_dropped,
     )
 
     if not passwords:
         return jsonify(
             success=False,
-            error="AI returned no usable passwords. Try adding more OSINT data or reducing the count.",
+            error=(
+                "AI returned no usable passwords. "
+                "Try adding more OSINT data or reducing the count."
+            ),
         ), 200
 
     return jsonify(
@@ -323,6 +362,7 @@ def generate():
         wordcount=len(passwords),
         passwords=passwords,
         min_length=min_length,
+        max_length=max_length,
         requested_count=count,
         model=OLLAMA_MODEL,
     )
