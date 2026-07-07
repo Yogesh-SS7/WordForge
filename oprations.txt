@@ -1,0 +1,156 @@
+================================================================
+  WordForge — AI-Assisted Wordlist Generator
+  Step-by-Step Setup & Run Guide
+================================================================
+
+PREREQUISITES
+-------------
+  - Python 3.10 or higher installed
+  - OLLAMA installed on your machine
+      Download: https://ollama.com/download
+  - Internet connection (first-time model download only)
+
+
+================================================================
+  STEP 1 — Install OLLAMA (skip if already installed)
+================================================================
+
+  1. Go to https://ollama.com/download
+  2. Download and install OLLAMA for Windows
+  3. After install, open a terminal and verify:
+
+       ollama --version
+
+
+================================================================
+  STEP 2 — Pull the Dolphin Model
+================================================================
+
+  Open a terminal (CMD or PowerShell) and run:
+
+       ollama pull dolphin-llama3:8b
+
+  This downloads the model (~5 GB). Only needed once.
+  To verify the model is available:
+
+       ollama list
+
+
+================================================================
+  STEP 3 — Start the OLLAMA Service
+================================================================
+
+  In a terminal, run:
+
+       ollama serve
+
+  Leave this terminal open and running in the background.
+  OLLAMA listens on: http://localhost:11434
+
+  NOTE: On Windows, OLLAMA may already be running as a system
+  tray app after installation. If so, skip this step.
+
+
+================================================================
+  STEP 4 — Install Python Dependencies
+================================================================
+
+  Open a NEW terminal window and navigate to the backend folder:
+
+       cd d:\RESUME_PROJECTS\WordForge\backend
+
+  Install the required packages:
+
+       pip install -r requirements.txt
+
+  Packages installed: flask, requests, flask-cors
+
+
+================================================================
+  STEP 5 — Start the Flask Backend
+================================================================
+
+  Still inside the backend folder, run:
+
+       python app.py
+
+  You should see:
+       * Running on http://127.0.0.1:5000
+       * Running on http://0.0.0.0:5000
+
+  Leave this terminal open.
+
+
+================================================================
+  STEP 6 — Open the App in Your Browser
+================================================================
+
+  Open any browser and go to:
+
+       http://localhost:5000
+
+  The WordForge dashboard will load.
+
+
+================================================================
+  STEP 7 — Generate a Wordlist
+================================================================
+
+  1. Fill in the OSINT form fields:
+       - Full Name (required)
+       - At least one other field (DOB, pet names, etc.)
+
+  2. Click the "Generate Wordlist" button.
+
+  3. Wait for the AI to respond (may take 30–90 seconds
+     depending on your hardware).
+
+  4. The generated passwords will appear below the form.
+
+  5. Use the buttons to:
+       - Download as .txt file
+       - Copy all to clipboard
+       - Show all passwords (if more than 20)
+
+
+================================================================
+  QUICK REFERENCE — Terminal Summary
+================================================================
+
+  Terminal 1 (OLLAMA):
+       ollama serve
+
+  Terminal 2 (Flask):
+       cd d:\RESUME_PROJECTS\WordForge\backend
+       python app.py
+
+  Browser:
+       http://localhost:5000
+
+
+================================================================
+  TROUBLESHOOTING
+================================================================
+
+  ERROR: "OLLAMA service not detected"
+    -> Make sure `ollama serve` is running in another terminal
+    -> Check OLLAMA is on port 11434: http://localhost:11434
+
+  ERROR: "model not found"
+    -> Run: ollama pull dolphin-llama3:8b
+
+  ERROR: "pip not found"
+    -> Make sure Python is added to your system PATH
+
+  ERROR: Port 5000 already in use
+    -> Kill the existing process or change the port in app.py:
+       app.run(host="0.0.0.0", port=5001, debug=True)
+
+  SLOW generation:
+    -> Normal on CPU. GPU will be significantly faster.
+    -> OLLAMA uses your GPU automatically if CUDA is available.
+
+
+================================================================
+  FOR AUTHORIZED SECURITY TESTING USE ONLY
+================================================================

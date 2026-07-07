@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="WordForge — AI-Assisted Password Wordlist Generator for authorized security testing. Powered by OLLAMA Dolphin." />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>WordForge | AI Wordlist Generator</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚒</text></svg>" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── Header ─────────────────────────────────────────── -->
+  <header>
+    <div class="header-left">
+      <div class="logo-wrap">
+        <div class="logo-icon">⚒</div>
+        <h1 class="app-title">WordForge</h1>
+      </div>
+      <p class="tagline">// AI-Assisted Password Wordlist Generator · OSINT → Wordlist Pipeline</p>
+    </div>
+    <div class="header-badge">🔒 Authorized Testing Only</div>
+  </header>
+
+  <div class="divider"></div>
+
+  <!-- ── Form Card ──────────────────────────────────────── -->
+  <div class="glass form-card" role="main">
+    <div class="section-title">Target OSINT Data</div>
+
+    <form id="osint-form" novalidate autocomplete="off">
+
+      <div class="form-grid">
+
+        <!-- Full Name -->
+        <div class="form-group">
+          <label for="full-name">
+            <span class="lbl-icon">👤</span>
+            Full Name
+            <span class="required-star">*</span>
+          </label>
+          <div class="input-wrap">
+            <input
+              type="text"
+              id="full-name"
+              name="full_name"
+              placeholder="e.g. John Smith"
+              autocomplete="off"
+            />
+          </div>
+        </div>
+
+        <!-- Nicknames -->
+        <div class="form-group">
+          <label for="nicknames">
+            <span class="lbl-icon">🏷️</span>
+            Nicknames / Aliases
+          </label>
+          <input
+            type="text"
+            id="nicknames"
+            name="nicknames"
+            placeholder="e.g. Johnny, JSmith, js99"
+          />
+          <span class="field-hint">comma-separated</span>
+        </div>
+
+        <!-- Date of Birth -->
+        <div class="form-group">
+          <label for="dob">
+            <span class="lbl-icon">📅</span>
+            Date of Birth
+          </label>
+          <input
+            type="date"
+            id="dob"
+            name="dob"
+          />
+        </div>
+
+        <!-- Partner Name -->
+        <div class="form-group">
+          <label for="partner-name">
+            <span class="lbl-icon">💑</span>
+            Partner / Spouse Name
+          </label>
+          <input
+            type="text"
+            id="partner-name"
+            name="partner_name"
+            placeholder="e.g. Sarah, Sarah Connor"
+          />
+        </div>
+
+        <!-- Children Names -->
+        <div class="form-group">
+          <label for="children-names">
+            <span class="lbl-icon">👶</span>
+            Children Names
+          </label>
+          <input
+            type="text"
+            id="children-names"
+            name="children_names"
+            placeholder="e.g. Liam, Emma"
+          />
+          <span class="field-hint">comma-separated</span>
+        </div>
+
+        <!-- Pet Names -->
+        <div class="form-group">
+          <label for="pet-names">
+            <span class="lbl-icon">🐾</span>
+            Pet Names
+          </label>
+          <input
+            type="text"
+            id="pet-names"
+            name="pet_names"
+            placeholder="e.g. Rex, Whiskers, Buddy"
+          />
+          <span class="field-hint">comma-separated</span>
+        </div>
+
+        <!-- Workplace -->
+        <div class="form-group">
+          <label for="workplace">
+            <span class="lbl-icon">🏢</span>
+            Workplace / Company
+          </label>
+          <input
+            type="text"
+            id="workplace"
+            name="workplace"
+            placeholder="e.g. Acme Corp, Google, NASA"
+          />
+        </div>
+
+        <!-- Hobbies -->
+        <div class="form-group">
+          <label for="hobbies">
+            <span class="lbl-icon">🎮</span>
+            Hobbies / Interests
+          </label>
+          <input
+            type="text"
+            id="hobbies"
+            name="hobbies"
+            placeholder="e.g. gaming, chess, cycling"
+          />
+          <span class="field-hint">comma-separated</span>
+        </div>
+
+        <!-- Favorite Things -->
+        <div class="form-group">
+          <label for="favorites">
+            <span class="lbl-icon">⭐</span>
+            Favorite Things
+          </label>
+          <input
+            type="text"
+            id="favorites"
+            name="favorites"
+            placeholder="e.g. blue, 7, Manchester United, AC/DC"
+          />
+          <span class="field-hint">color, number, sports team, band, etc.</span>
+        </div>
+
+        <!-- Known Usernames -->
+        <div class="form-group">
+          <label for="known-usernames">
+            <span class="lbl-icon">🔖</span>
+            Known Usernames
+          </label>
+          <input
+            type="text"
+            id="known-usernames"
+            name="known_usernames"
+            placeholder="e.g. john_s, j.smith99, thejohn"
+          />
+          <span class="field-hint">comma-separated</span>
+        </div>
+
+        <!-- Important Dates -->
+        <div class="form-group full-width">
+          <label for="important-dates">
+            <span class="lbl-icon">📆</span>
+            Important Dates
+          </label>
+          <input
+            type="text"
+            id="important-dates"
+            name="important_dates"
+            placeholder="e.g. Anniversary 14/02/2010, Graduation 2015, Dog's birthday 05/07"
+          />
+          <span class="field-hint">anniversaries, graduations, milestones — any format</span>
+        </div>
+
+        <!-- Additional Context -->
+        <div class="form-group full-width">
+          <label for="context">
+            <span class="lbl-icon">📝</span>
+            Additional Context
+          </label>
+          <textarea
+            id="context"
+            name="context"
+            placeholder="Any other relevant details — favorite movies, car model, city, school name, superstitions, numbers, etc."
+          ></textarea>
+        </div>
+
+      </div><!-- /form-grid -->
+
+      <!-- ── Generation Settings ──────────────────────────── -->
+      <div class="gen-settings-panel">
+        <div class="gen-settings-title">⚙ Generation Settings</div>
+
+        <div class="gen-settings-row">
+
+          <!-- Count selector -->
+          <div class="gen-setting-group">
+            <label class="gen-label" for="custom-count">
+              Passwords to Generate
+            </label>
+            <div class="count-selector">
+              <button type="button" class="count-chip active" data-count="100">100</button>
+              <button type="button" class="count-chip" data-count="150">150</button>
+              <button type="button" class="count-chip" data-count="200">200</button>
+              <button type="button" class="count-chip" data-count="300">300</button>
+              <button type="button" class="count-chip" data-count="custom">Custom</button>
+            </div>
+            <div class="custom-count-wrap" id="custom-count-wrap" style="display:none;">
+              <input
+                type="number"
+                id="custom-count"
+                min="10"
+                max="1000"
+                value="200"
+                placeholder="e.g. 250"
+              />
+              <span class="field-hint">10 – 1000</span>
+            </div>
+          </div>
+
+          <!-- Min length -->
+          <div class="gen-setting-group">
+            <label class="gen-label" for="min-length">
+              Minimum Password Length
+            </label>
+            <div class="length-control">
+              <button type="button" class="length-btn" id="len-minus" aria-label="Decrease">−</button>
+              <span class="length-val" id="length-display">8</span>
+              <button type="button" class="length-btn" id="len-plus" aria-label="Increase">+</button>
+              <input type="hidden" id="min-length" value="8" />
+            </div>
+            <span class="field-hint">characters minimum per password</span>
+          </div>
+
+        </div>
+      </div><!-- /gen-settings-panel -->
+
+      <!-- Error Banner -->
+      <div class="error-banner" id="error-banner" role="alert" aria-live="polite">
+        <span class="error-icon">⚠️</span>
+        <span class="error-msg" id="error-message"></span>
+      </div>
+
+      <!-- Submit -->
+      <button type="submit" class="btn-generate" id="btn-generate">
+        <span class="btn-inner">
+          <div class="spinner" id="btn-spinner"></div>
+          <span id="btn-text">⚡ Generate Wordlist</span>
+        </span>
+      </button>
+
+    </form>
+  </div><!-- /form-card -->
+
+  <!-- ── Results Section ────────────────────────────────── -->
+  <section id="results-section" aria-label="Generated wordlist results">
+    <div class="glass results-card">
+
+      <div class="section-title">Generated Wordlist</div>
+
+      <!-- Stats -->
+      <div class="stats-row">
+        <div class="stat-chip">
+          <span class="stat-val" id="word-count">0</span>
+          <span class="stat-label">passwords generated</span>
+        </div>
+        <div class="stat-chip stat-chip-cyan">
+          <span class="stat-val" id="unique-count">0</span>
+          <span class="stat-label">unique entries</span>
+        </div>
+        <div class="stat-chip stat-chip-orange" id="min-len-chip" style="display:none;">
+          <span class="stat-val" id="min-len-display">8</span>
+          <span class="stat-label">char min length</span>
+        </div>
+        <div class="stat-chip stat-chip-warn" id="filtered-chip" style="display:none;">
+          <span class="stat-val" id="filtered-count">0</span>
+          <span class="stat-label">filtered (too short)</span>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="controls-row">
+        <button class="btn-action btn-download" id="btn-download" title="Download wordlist as .txt">
+          ⬇ Download .txt
+        </button>
+        <button class="btn-action btn-copy" id="btn-copy" title="Copy all passwords">
+          ⎘ Copy All
+        </button>
+        <button class="btn-action btn-reset" id="btn-reset" title="Clear results and generate again">
+          ↺ New Session
+        </button>
+      </div>
+
+      <!-- Wordlist Table -->
+      <div class="wordlist-container">
+        <div class="wordlist-header">
+          <span>📋 Password Candidates</span>
+          <span style="font-size:0.65rem; opacity:0.6;">Hover a row to copy individually</span>
+        </div>
+        <div class="wordlist-scroll">
+          <div id="wordlist-items"></div>
+        </div>
+        <div class="show-more-wrap" id="show-more-wrap" style="display:none;">
+          <button class="btn-show-more" id="btn-show-more">▼ Show All Passwords</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── Footer ─────────────────────────────────────────── -->
+  <footer>
+    <p>WordForge · AI-Assisted Wordlist Generator · For <strong>authorized penetration testing only</strong></p>
+    <p style="margin-top:0.4rem; opacity:0.5;">Powered by OLLAMA Dolphin · Local LLM · No data leaves your machine</p>
+  </footer>
+
+</div><!-- /#app -->
+
+<!-- Toast -->
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
